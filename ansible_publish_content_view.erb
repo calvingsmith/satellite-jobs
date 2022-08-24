@@ -1,0 +1,84 @@
+<%#
+name: Ansible - Publish Content View
+snippet: false
+template_inputs:
+- name: content_view
+  required: true
+  input_type: user
+  advanced: false
+  value_type: resource
+  resource_type: Katello::ContentView
+  hidden_value: false
+- name: username
+  required: true
+  input_type: user
+  advanced: false
+  value_type: plain
+  resource_type: Katello::ActivationKey
+  hidden_value: false
+- name: password
+  required: true
+  input_type: user
+  advanced: false
+  value_type: plain
+  resource_type: Katello::ActivationKey
+  hidden_value: true
+- name: cv_organization
+  required: true
+  input_type: user
+  advanced: false
+  value_type: resource
+  resource_type: Organization
+  hidden_value: false
+model: JobTemplate
+job_category: Maintenance Operations
+description_format: "%{template_name}"
+provider_type: Ansible
+kind: job_template
+organizations:
+- Demo Organization
+- test
+locations:
+- Amazon
+- Laptop Datacenter
+%>
+
+---
+- hosts: all
+
+  tasks:
+    - name: get all content view names
+      redhat.satellite.content_view_info:
+        username: "<%= input('username') %>"
+        password: "<%= input('password') %>"
+        server_url: "<%= foreman_server_url %>"
+      register: cv
+    
+    - name: convert org ID to organization name
+      redhat.satellite.organization_info:
+        username: "<%= input('username') %>"
+        password: "<%= input('password') %>"
+        server_url: "<%= foreman_server_url %>"
+        search: "id = <%= input('cv_organization') %>"
+      register: org
+      
+    - name: parse out organization name
+      set_fact:
+        org_name: "{{ org.organizations.0.name  }}"
+        cv_id: <%= input('content_view') %>
+    
+    - name: parse out content view name
+      set_fact:
+        cv_name: "{{ (cv.content_views | selectattr('id','equalto', cv_id )| map(attribute='name') | list | first) }}"
+        
+    - debug:
+        msg: "Content View name is {{ cv_name }}, Organization is {{ org_name }}"
+        
+    - name: publish content view
+      redhat.satellite.content_view_version:
+        username: "<%= input('username') %>"
+        password: "<%= input('password') %>"
+        server_url: "<%= foreman_server_url %>"
+        content_view: "{{ cv_name}}"
+        organization: "{{ org_name }}"
+    
